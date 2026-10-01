@@ -43,10 +43,14 @@ period; turn off **Include partial start dates** to require a precise start date
 Unknown end dates use the start-date interval and are not assumed ongoing.
 Select disaster groups and types directly, or use a classification-key prefix
 with `*` wildcards. Empty group/type selections include all categories.
+Select countries with the searchable sidebar checkboxes. **Select all** and
+**Clear all** apply to the current region/subregion, even while searching.
+Hidden country choices are preserved when searching or changing geography;
+**Reset** selects all countries again. Country selections apply to every view.
 
 ### Compare countries
 
-Open **Country comparison** after loading your workbook. Choose countries and
+Open **Country comparison** after loading your workbook. Check countries in the sidebar and choose
 impact measures, then compare totals, means per event, or medians per event.
 Means default to events with a reported value, with an explicit option to divide
 the observed sum by all events. Blank impacts remain missing; explicit zero is

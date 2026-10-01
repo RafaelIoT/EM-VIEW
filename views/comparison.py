@@ -110,14 +110,8 @@ def main():
 
     start, end = get_filter_period()
     st.caption(f"{start:%d %b %Y} – {end:%d %b %Y} · {len(data):,} records after sidebar filters")
-    countries_available = sorted(data["Country"].dropna().unique())
-    if "comparison.countries" in st.session_state:
-        st.session_state["comparison.countries"] = [
-            name for name in st.session_state["comparison.countries"] if name in countries_available
-        ]
-    countries = st.multiselect("Countries to compare", countries_available,
-                               default=countries_available[:2], key="comparison.countries",
-                               help="Choose any number of countries available after sidebar filters.")
+    countries = sorted(data["Country"].dropna().unique())
+    st.caption("Choose countries with the sidebar checkboxes. This selection applies to every view.")
     controls = st.columns([2, 1, 1])
     available_metrics = [name for name, metric in METRICS.items()
                          if metric.column is None or metric.column in data]
@@ -210,7 +204,7 @@ def main():
         include_partial_start_dates=st.session_state.get("filter.include_partial", True),
         classification_key=st.session_state["filter.classification_key"],
         region=st.session_state["filter.region"], subregion=st.session_state["filter.subregion"],
-        sidebar_country=st.session_state["filter.country"],
+        sidebar_countries=st.session_state["filter.countries"],
         disaster_groups=st.session_state.get("filter.groups", []), disaster_types=st.session_state.get("filter.types", []),
         countries=countries, metrics=metrics, aggregation=aggregation, average_denominator=denominator,
         normalization=normalization, chart_settings=chart_settings | {"palette": palette},

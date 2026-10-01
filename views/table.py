@@ -28,7 +28,7 @@ else:
     columns = st.multiselect(
         "Select columns:",
         data.columns,
-        default=DEFAULT_COLUMNS
+        default=[column for column in DEFAULT_COLUMNS if column in data]
     )
 
     display_rows = 15

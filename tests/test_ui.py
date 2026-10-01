@@ -69,9 +69,9 @@ class ComparisonUITests(unittest.TestCase):
         summary = summary_frame(at)
         japan = summary[(summary["Country"] == "Japan") & (summary["Metric"] == "Deaths")]
         self.assertEqual(japan["Value"].iloc[0], 5)
-        at.multiselect(key="comparison.countries").set_value([]).run()
+        at.button(key="filter.countries_none").click().run()
         self.assertEqual(len(at.exception), 0)
-        self.assertIn("Select at least one country", at.info[0].value)
+        self.assertIn("No events match", at.info[0].value)
 
     def test_sidebar_disaster_and_date_filters_reach_the_view(self):
         at = comparison_app()
@@ -129,7 +129,37 @@ class ComparisonUITests(unittest.TestCase):
         self.assertEqual(len(at.exception), 0)
         self.assertIn("No events match", at.info[0].value)
         self.assertEqual(len(at.sidebar.number_input), 2)
-        self.assertEqual(len(at.sidebar.button), 1)  # Reset remains usable.
+        self.assertIn("Reset", [button.label for button in at.sidebar.button])
+
+    def test_country_checkboxes_preserve_hidden_selections_and_reset(self):
+        at = comparison_app()
+        at.checkbox(key="filter.country_choice.Japan").uncheck().run()
+        self.assertEqual(summary_frame(at)["Country"].unique().tolist(), ["Myanmar"])
+        at.text_input(key="filter.country_search").set_value("Japan").run()
+        self.assertTrue(at.session_state["filter.countries"] == ["Myanmar"])
+        at.switch_page("views/table.py").run()
+        self.assertEqual(len(at.exception), 0)
+        self.assertEqual(at.dataframe[0].value["Country"].unique().tolist(), ["Myanmar"])
+        at.text_input(key="filter.country_search").set_value("").run()
+        self.assertFalse(at.checkbox(key="filter.country_choice.Japan").value)
+        self.assertTrue(at.checkbox(key="filter.country_choice.Myanmar").value)
+        next(button for button in at.sidebar.button if button.label == "Reset").click().run()
+        self.assertEqual(at.session_state["filter.countries"], ["Japan", "Myanmar"])
+
+    def test_country_all_buttons_ignore_search_and_geography_preserves_choices(self):
+        at = comparison_app()
+        at.checkbox(key="filter.country_choice.Myanmar").uncheck().run()
+        at.selectbox(key="filter.subregion").select("South-Eastern Asia").run()
+        self.assertIn("No events match", at.info[0].value)
+        at.button(key="filter.countries_all").click().run()
+        self.assertEqual(summary_frame(at)["Country"].unique().tolist(), ["Myanmar"])
+        at.selectbox(key="filter.subregion").select("All").run()
+        self.assertEqual(at.session_state["filter.countries"], ["Japan", "Myanmar"])
+        at.text_input(key="filter.country_search").set_value("Japan").run()
+        at.button(key="filter.countries_none").click().run()
+        self.assertEqual(at.session_state["filter.countries"], [])
+        at.button(key="filter.countries_all").click().run()
+        self.assertEqual(at.session_state["filter.countries"], ["Japan", "Myanmar"])
 
 
 if __name__ == "__main__":

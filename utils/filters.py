@@ -5,6 +5,7 @@ import pandas as pd
 import streamlit as st
 
 from utils.dates import filter_dates
+from utils.country_picker import country_checkboxes
 
 DOC_URI = "https://doc.emdat.be/docs"
 CLASSIF_KEY_DOC_URI = (
@@ -29,6 +30,11 @@ def init_sidebar_filters() -> None:
         # Initialize filters once enabled
         if "filter.disabled" not in st.session_state:
             set_filters_to_default()
+        if "filter.countries" not in ss:
+            country = ss.get("filter.country")
+            ss["filter.countries"] = [country] if country else sorted(ss["data"]["Country"].dropna().unique())
+        # Retained for older sessions and the legacy map view.
+        ss["filter.country"] = None
 
         col1, col2 = st.sidebar.columns(2)
 
@@ -107,13 +113,7 @@ def init_sidebar_filters() -> None:
             on_change=process_subregion
         )
 
-        st.sidebar.selectbox(
-            label="**Country**",
-            options=ss['country_list'],
-            key="filter.country",
-            format_func=lambda x: 'All' if x is None else x,
-            on_change=process_country
-        )
+        country_checkboxes([country for country in ss['country_list'] if country is not None])
 
         st.sidebar.button(
             "Reset",
@@ -168,21 +168,6 @@ def process_subregion() -> None:
             ss['country_list'] = [None] + sorted(rd['country'].unique())
 
 
-def process_country() -> None:
-    """Process country and update other levels accordingly."""
-    ss = st.session_state
-    rd = ss['region_data']
-    region = ss['filter.region']
-    subregion = ss['filter.subregion']
-    country = ss['filter.country']
-    if country:
-        valid_data = rd[rd['country'] == country]
-        if region not in valid_data['region'].values:
-            ss['filter.region'] = valid_data.iloc[0]['region']
-        if subregion not in valid_data['subregion'].values:
-            ss['filter.subregion'] = valid_data.iloc[0]['subregion']
-
-
 def get_filter_period() -> tuple[date, date]:
     """Return the active inclusive period for views and exports."""
     ss = st.session_state
@@ -201,7 +186,6 @@ def get_filtered_data() -> pd.DataFrame:
     classification_key = ss["filter.classification_key"].strip()
     region = ss["filter.region"]
     subregion = ss["filter.subregion"]
-    country = ss["filter.country"]
 
     # Initiate filtering
     data_filtered = filter_dates(
@@ -226,8 +210,7 @@ def get_filtered_data() -> pd.DataFrame:
         data_filtered = data_filtered[data_filtered['Region'] == region]
     if subregion:
         data_filtered = data_filtered[data_filtered['Subregion'] == subregion]
-    if country:
-        data_filtered = data_filtered[data_filtered['Country'] == country]
+    data_filtered = data_filtered[data_filtered['Country'].isin(ss["filter.countries"])]
 
     return data_filtered
 
@@ -257,6 +240,8 @@ def set_filters_to_default() -> None:
     ss['filter.region'] = None
     ss['filter.subregion'] = None
     ss['filter.country'] = None
+    ss['filter.countries'] = sorted(data['Country'].dropna().unique())
+    ss['filter.country_search'] = ""
     ss['region_list'] = [None] + sorted(rd['region'].unique())
     ss['subregion_list'] = [None] + sorted(rd['subregion'].unique())
     ss['country_list'] = [None] + sorted(rd['country'].unique())
