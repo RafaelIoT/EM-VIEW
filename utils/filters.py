@@ -54,6 +54,8 @@ def init_sidebar_filters() -> None:
             key='filter.end'
         )
 
+        country_checkboxes([country for country in ss['country_list'] if country is not None])
+
         st.sidebar.toggle("Use exact dates", key="filter.exact_dates")
         if ss["filter.exact_dates"]:
             ss.setdefault("filter.date_start", date(ss["filter.start"], 1, 1))
@@ -130,8 +132,6 @@ def init_sidebar_filters() -> None:
             format_func=lambda x: 'All' if x is None else x,
             on_change=process_subregion
         )
-
-        country_checkboxes([country for country in ss['country_list'] if country is not None])
 
         st.sidebar.button(
             "Reset",
