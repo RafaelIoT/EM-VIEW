@@ -1,6 +1,7 @@
 """Exercise navigation and comparison controls through Streamlit's runtime."""
 from datetime import date
 from pathlib import Path
+import logging
 import unittest
 
 import pandas as pd
@@ -8,6 +9,11 @@ from streamlit.testing.v1 import AppTest
 
 
 ROOT = Path(__file__).resolve().parents[1]
+logging.getLogger("streamlit.runtime.scriptrunner_utils.script_run_context").setLevel(logging.ERROR)
+
+
+def summary_frame(at):
+    return next(frame.value for frame in at.dataframe if "Coverage (%)" in frame.value.columns)
 
 
 def comparison_app():
@@ -52,11 +58,11 @@ class ComparisonUITests(unittest.TestCase):
         at = comparison_app()
         self.assertEqual(len(at.exception), 0)
         at.selectbox(key="comparison.aggregation").select("Mean per event").run()
-        summary = at.dataframe[0].value
+        summary = summary_frame(at)
         japan = summary[(summary["Country"] == "Japan") & (summary["Metric"] == "Deaths")]
         self.assertEqual(japan["Value"].iloc[0], 10)
         at.selectbox(key="comparison.denominator").select("All events").run()
-        summary = at.dataframe[0].value
+        summary = summary_frame(at)
         japan = summary[(summary["Country"] == "Japan") & (summary["Metric"] == "Deaths")]
         self.assertEqual(japan["Value"].iloc[0], 5)
         at.multiselect(key="comparison.countries").set_value([]).run()
@@ -67,11 +73,29 @@ class ComparisonUITests(unittest.TestCase):
         at = comparison_app()
         at.multiselect(key="filter.types").set_value(["Storm"]).run()
         self.assertEqual(len(at.exception), 0)
-        self.assertEqual(at.dataframe[0].value["Events"].max(), 1)
+        self.assertEqual(summary_frame(at)["Events"].max(), 1)
         at.toggle(key="filter.exact_dates").set_value(True).run()
         at.date_input(key="filter.date_start").set_value(date(2021, 3, 2)).run()
         self.assertEqual(len(at.exception), 0)
         self.assertIn("No events match", at.info[0].value)
+
+    def test_country_context_and_normalization_update_the_same_charts(self):
+        from utils.worldbank import CONTEXT_COLUMNS
+        at = comparison_app()
+        context = pd.DataFrame([
+            ["JPN", 2020, 100000, 1000000, 10], ["JPN", 2021, 200000, 2000000, 10],
+            ["MMR", 2020, 100000, 1000000, 10],
+        ], columns=CONTEXT_COLUMNS)
+        at.session_state["comparison.context"] = context
+        at.run()
+        at.selectbox(key="comparison.normalization").select("Per 100,000 residents").run()
+        self.assertEqual(len(at.exception), 0)
+        frame = summary_frame(at)
+        self.assertAlmostEqual(frame.query("Country == 'Myanmar' and Metric == 'Deaths'")["Value"].iloc[0], 30)
+        at.multiselect(key="comparison.metrics").set_value(["Damage (current US$)"]).run()
+        at.selectbox(key="comparison.normalization").select("% of event-year GDP").run()
+        self.assertEqual(len(at.exception), 0)
+        self.assertEqual(summary_frame(at).query("Country == 'Japan'")["Value"].iloc[0], 0.1)
 
 
 if __name__ == "__main__":

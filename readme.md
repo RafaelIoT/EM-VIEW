@@ -53,6 +53,27 @@ the observed sum by all events. Blank impacts remain missing; explicit zero is
 a reported value. Reporting coverage is included in chart hovers and a table.
 Damage charts convert EM-DAT's thousands of US dollars to US dollars.
 
+### Add population and GDP context
+
+In Country comparison, **Load country context** retrieves annual
+World Bank WDI population (`SP.POP.TOTL`), GDP in current US dollars
+(`NY.GDP.MKTP.CD`), and GDP per capita (`NY.GDP.PCAP.CD`). Requests are cached for
+24 hours; no API key is required. Offline/API failures leave absolute comparisons
+available. Context values show their source years, using the latest reported
+value at or before the end year for the context table only.
+
+**Per 100,000 residents** divides each event's impact by that country's population
+in the event's start year. **% of event-year GDP** is available when the only
+selected metric is damage in current US dollars, avoiding mismatched inflation
+bases. Rates require exact country/start-year matches; missing denominators are
+excluded and reported in the coverage table. Period totals sum event-year rates,
+not shares of a single period population or GDP. Historical countries and years
+without WDI observations remain unavailable.
+
+Sources: [World Bank population](https://data.worldbank.org/indicator/SP.POP.TOTL),
+[GDP](https://data.worldbank.org/indicator/NY.GDP.MKTP.CD),
+[GDP per capita](https://data.worldbank.org/indicator/NY.GDP.PCAP.CD).
+
 ### Run App
 
 With streamlit installed, use the following command to run the app:
