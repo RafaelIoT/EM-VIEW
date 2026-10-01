@@ -48,6 +48,12 @@ Select countries with the searchable sidebar checkboxes. **Select all** and
 Hidden country choices are preserved when searching or changing geography;
 **Reset** selects all countries again. Country selections apply to every view.
 
+**More event filters** adds disaster subgroup/subtype, requirements for reported
+impact values, minimum deaths/affected per event, and a text search across all
+views. Reporting requirements include explicit zeros. A threshold of zero is
+disabled; a positive threshold excludes unreported impacts. Multiple reporting
+requirements must all be satisfied. Reset clears these filters.
+
 ### Compare countries
 
 Open **Country comparison** after loading your workbook. Check countries in the sidebar and choose

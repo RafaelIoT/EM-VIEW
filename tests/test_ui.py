@@ -163,6 +163,20 @@ class ComparisonUITests(unittest.TestCase):
         at.selectbox(key="time.style").select("Separate panels").run()
         self.assertEqual(len(at.exception), 0)
 
+    def test_detail_filters_propagate_and_reset(self):
+        at = comparison_app()
+        at.multiselect(key="filter.subtypes").set_value(["Riverine flood"]).run()
+        self.assertEqual(summary_frame(at)["Events"].sum(), 4)  # Two measures, two events.
+        at.multiselect(key="filter.reported").set_value(["Affected people"]).run()
+        self.assertEqual(summary_frame(at)["Country"].unique().tolist(), ["Japan"])
+        at.number_input(key="filter.minimum_deaths").set_value(11).run()
+        self.assertIn("No events match", at.info[0].value)
+        next(button for button in at.sidebar.button if button.label == "Reset").click().run()
+        at.text_input(key="filter.event_search").set_value("2020-0003-MMR").run()
+        at.switch_page("views/time.py").run()
+        self.assertEqual(len(at.exception), 0)
+        self.assertEqual(summary_frame(at)["Country"].unique().tolist(), ["Myanmar"])
+
     def test_country_all_buttons_ignore_search_and_geography_preserves_choices(self):
         at = comparison_app()
         at.checkbox(key="filter.country_choice.Myanmar").uncheck().run()

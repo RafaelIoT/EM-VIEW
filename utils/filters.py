@@ -6,6 +6,8 @@ import streamlit as st
 
 from utils.dates import filter_dates
 from utils.country_picker import country_checkboxes
+from utils.comparison import METRICS
+from utils.detail_filters import filter_event_details
 
 DOC_URI = "https://doc.emdat.be/docs"
 CLASSIF_KEY_DOC_URI = (
@@ -87,6 +89,22 @@ def init_sidebar_filters() -> None:
             "Disaster types", sorted(ss["data"]["Disaster Type"].dropna().unique()),
             key="filter.types", help="Leave empty to include all types.",
         )
+
+        with st.sidebar.expander("More event filters"):
+            for column, key in [("Disaster Subgroup", "filter.subgroups"), ("Disaster Subtype", "filter.subtypes")]:
+                if column in ss["data"]:
+                    st.multiselect(column + "s", sorted(ss["data"][column].dropna().unique()),
+                                   key=key, help="Leave empty to include all categories.")
+            available = [name for name, spec in METRICS.items() if spec.column and spec.column in ss["data"]]
+            st.multiselect("Require reported values", available, key="filter.reported",
+                           help="Require a reported value for every selected measure. Explicit zeros count as reported.")
+            for column, label, key in [("Total Deaths", "Minimum deaths per event", "filter.minimum_deaths"),
+                                        ("Total Affected", "Minimum affected per event", "filter.minimum_affected")]:
+                if column in ss["data"]:
+                    st.number_input(label, min_value=0, step=1, key=key,
+                                    help="0 disables the threshold. A positive threshold excludes missing impacts.")
+            st.text_input("Search events in all views", key="filter.event_search",
+                           help="Search ID, name, location, country or disaster type/subtype.")
 
         st.sidebar.text_input(
             label="**Classification Key**",
@@ -211,8 +229,12 @@ def get_filtered_data() -> pd.DataFrame:
     if subregion:
         data_filtered = data_filtered[data_filtered['Subregion'] == subregion]
     data_filtered = data_filtered[data_filtered['Country'].isin(ss["filter.countries"])]
-
-    return data_filtered
+    return filter_event_details(
+        data_filtered, ss.get("filter.subgroups", []), ss.get("filter.subtypes", []),
+        [METRICS[name].column for name in ss.get("filter.reported", [])],
+        ss.get("filter.minimum_deaths", 0), ss.get("filter.minimum_affected", 0),
+        ss.get("filter.event_search", ""),
+    )
 
 
 def set_filters_to_default() -> None:
@@ -236,6 +258,12 @@ def set_filters_to_default() -> None:
     ss['filter.include_partial'] = True
     ss['filter.groups'] = []
     ss['filter.types'] = []
+    ss['filter.subgroups'] = []
+    ss['filter.subtypes'] = []
+    ss['filter.reported'] = []
+    ss['filter.minimum_deaths'] = 0
+    ss['filter.minimum_affected'] = 0
+    ss['filter.event_search'] = ""
     ss['filter.classification_key'] = ""
     ss['filter.region'] = None
     ss['filter.subregion'] = None
