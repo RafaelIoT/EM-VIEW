@@ -16,6 +16,8 @@ CLASSIF_KEY_DOC_URI = (
 def init_sidebar_filters() -> None:
     """Initialize sidebar filters."""
     ss = st.session_state
+    if ss.pop("filter.reset_pending", False):
+        set_filters_to_default()
 
     # Not having session states mean that data has not been uploaded and that
     # filters should be disabled.

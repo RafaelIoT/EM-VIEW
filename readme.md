@@ -60,7 +60,9 @@ World Bank WDI population (`SP.POP.TOTL`), GDP in current US dollars
 (`NY.GDP.MKTP.CD`), and GDP per capita (`NY.GDP.PCAP.CD`). Requests are cached for
 24 hours; no API key is required. Offline/API failures leave absolute comparisons
 available. Context values show their source years, using the latest reported
-value at or before the end year for the context table only.
+value at or before the end year within the retrieved series for the context table
+only. The query covers every selected event start year and at least five years
+before the reference year; its year range is displayed.
 
 **Per 100,000 residents** divides each event's impact by that country's population
 in the event's start year. **% of event-year GDP** is available when the only
@@ -73,6 +75,32 @@ without WDI observations remain unavailable.
 Sources: [World Bank population](https://data.worldbank.org/indicator/SP.POP.TOTL),
 [GDP](https://data.worldbank.org/indicator/NY.GDP.MKTP.CD),
 [GDP per capita](https://data.worldbank.org/indicator/NY.GDP.PCAP.CD).
+
+### Customize and export a comparison
+
+**Customize charts** controls country-bar orientation, category ordering, color
+palette, logarithmic axes, and value labels. Annual lines preserve gaps for years
+without records. Country colors stay stable when countries are deselected.
+**Event records** lets you inspect all source columns and search by ID, name,
+location, country or type. This table's search does not change the comparison.
+
+Download the country summary or displayed event records as CSV, or download a
+full ZIP containing country/type/year summaries, every analyzed source row,
+annual country indicators (if loaded), and `analysis.json` with filters, units,
+normalization and source provenance. Blank CSV cells remain unavailable. Raw
+source damage columns keep their original thousands-of-US$ units; summarized
+damage Values are in US$.
+
+### Run regression checks
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+Tests cover date boundaries and uncertainty, denominators and missing impacts,
+country/year normalizations, World Bank pagination and failures, chart gaps,
+exports, and Streamlit navigation and control changes. Tests use synthetic data;
+no EM-DAT workbook is committed to this repository.
 
 ### Run App
 

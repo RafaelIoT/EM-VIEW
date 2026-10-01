@@ -3,20 +3,21 @@ from datetime import date
 from pathlib import Path
 import logging
 import unittest
+from unittest.mock import patch
 
 import pandas as pd
 from streamlit.testing.v1 import AppTest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-logging.getLogger("streamlit.runtime.scriptrunner_utils.script_run_context").setLevel(logging.ERROR)
+logging.disable(logging.WARNING)
 
 
 def summary_frame(at):
     return next(frame.value for frame in at.dataframe if "Coverage (%)" in frame.value.columns)
 
 
-def comparison_app():
+def comparison_app(source_data=None):
     data = pd.DataFrame({
         "DisNo.": ["2020-0001-JPN", "2021-0002-JPN", "2020-0003-MMR"],
         "Country": ["Japan", "Japan", "Myanmar"], "ISO": ["JPN", "JPN", "MMR"],
@@ -27,6 +28,9 @@ def comparison_app():
         "End Year": [None, 2021, 2020], "Total Deaths": [10, None, 30],
         "Total Affected": [0, 100, None], "Total Damage ('000 US$)": [1, None, 2],
     })
+    if source_data is not None:
+        data = source_data
+    first_year, last_year = int(data["Start Year"].min()), int(data["Start Year"].max())
     at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=15)
     at.session_state["data"] = data
     at.session_state["metadata"] = {"Source": "Synthetic test fixture"}
@@ -36,15 +40,15 @@ def comparison_app():
     region.columns = [c.lower() for c in region]
     at.session_state["region_data"] = region
     settings = {
-        "filter.disabled": False, "filter.year_min": 2020, "filter.year_max": 2021,
-        "filter.start": 2020, "filter.end": 2021, "filter.classification_key": "",
+        "filter.disabled": False, "filter.year_min": first_year, "filter.year_max": last_year,
+        "filter.start": first_year, "filter.end": last_year, "filter.classification_key": "",
         "filter.region": None, "filter.subregion": None, "filter.country": None,
-        "filter.exact_dates": False, "filter.date_start": date(2020, 1, 1),
-        "filter.date_end": date(2021, 12, 31), "filter.date_match": "starts",
+        "filter.exact_dates": False, "filter.date_start": date(first_year, 1, 1),
+        "filter.date_end": date(last_year, 12, 31), "filter.date_match": "starts",
         "filter.include_partial": True, "filter.groups": [], "filter.types": [],
-        "region_list": [None, "Asia"],
-        "subregion_list": [None, "Eastern Asia", "South-Eastern Asia"],
-        "country_list": [None, "Japan", "Myanmar"],
+        "region_list": [None] + sorted(region["region"].unique()),
+        "subregion_list": [None] + sorted(region["subregion"].unique()),
+        "country_list": [None] + sorted(region["country"].unique()),
     }
     for key, value in settings.items():
         at.session_state[key] = value
@@ -96,6 +100,36 @@ class ComparisonUITests(unittest.TestCase):
         at.selectbox(key="comparison.normalization").select("% of event-year GDP").run()
         self.assertEqual(len(at.exception), 0)
         self.assertEqual(summary_frame(at).query("Country == 'Japan'")["Value"].iloc[0], 0.1)
+
+    def test_customization_event_search_and_downloads(self):
+        at = comparison_app()
+        at.selectbox(key="comparison.orientation").select("Horizontal").run()
+        at.selectbox(key="comparison.order").select("Highest impact").run()
+        at.checkbox(key="comparison.value_labels").set_value(True).run()
+        at.text_input(key="comparison.event_search").set_value("2020-0003-MMR").run()
+        self.assertEqual(len(at.exception), 0)
+        self.assertEqual(len(at.dataframe[-1].value), 1)
+        self.assertEqual(at.dataframe[-1].value["Country"].iloc[0], "Myanmar")
+        self.assertEqual(summary_frame(at)["Events"].max(), 2)  # Search is table-only.
+        self.assertEqual(len(at.get("download_button")), 3)
+
+    def test_world_bank_failure_leaves_absolute_comparison_available(self):
+        import requests
+        at = comparison_app()
+        with patch("utils.worldbank.requests.get", side_effect=requests.ConnectionError("Test offline")):
+            at.button(key="comparison.load_context").click().run()
+        self.assertEqual(len(at.exception), 0)
+        self.assertIn("Absolute comparisons remain available", at.warning[0].value)
+        self.assertEqual(summary_frame(at)["Value"].sum(), 140)
+
+    def test_empty_legacy_view_keeps_shared_filters_available(self):
+        at = comparison_app()
+        at.text_input(key="filter.classification_key").set_value("no-such-classification").run()
+        at.switch_page("views/metric.py").run()
+        self.assertEqual(len(at.exception), 0)
+        self.assertIn("No events match", at.info[0].value)
+        self.assertEqual(len(at.sidebar.number_input), 2)
+        self.assertEqual(len(at.sidebar.button), 1)  # Reset remains usable.
 
 
 if __name__ == "__main__":

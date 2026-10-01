@@ -1,11 +1,12 @@
 import pandas as pd
-import plotly.express as px
 import requests
 import streamlit as st
 
 from utils.comparison import AGGREGATIONS, DENOMINATORS, METRICS, aggregate_impacts
 from utils.filters import get_filter_period, get_filtered_data
 from utils.worldbank import fetch_country_indicators, country_snapshot
+from utils.comparison_charts import PALETTES, country_colors, make_comparison_chart
+from utils.comparison_exports import analysis_bundle, csv_bytes, summary_for_export
 
 
 @st.cache_data(ttl=86400, show_spinner=False)
@@ -44,6 +45,7 @@ def show_country_context(selected, reference_year):
            for name in ("Population", "GDP (current US$)", "GDP per capita (current US$)")},
     })
     st.caption(f"Context reference: {reference_year}. Latest available value at or before that year. "
+               f"Retrieved series: {scope.get('start_year', 'unavailable')}–{scope.get('end_year', 'unavailable')}. "
                f"World Bank updated: {scope.get('last_updated', 'unavailable')}. "
                f"Retrieved: {scope.get('retrieved_at', 'unavailable')}.")
     with st.expander("Annual country indicators and sources"):
@@ -54,8 +56,7 @@ def show_country_context(selected, reference_year):
     return context
 
 
-def show_charts(summary, metrics, dimension, countries, aggregation, normalization="Absolute"):
-    colors = dict(zip(countries, px.colors.qualitative.Safe * (len(countries) // 11 + 1)))
+def show_charts(summary, metrics, dimension, countries, aggregation, normalization, settings, colors):
     for offset in range(0, len(metrics), 2):
         columns = st.columns(2)
         for column, metric in zip(columns, metrics[offset:offset + 2]):
@@ -65,28 +66,35 @@ def show_charts(summary, metrics, dimension, countries, aggregation, normalizati
                 if frame.empty or frame["Value"].isna().all():
                     st.info("No reported values for this metric in the selection.")
                     continue
-                unit = METRICS[metric].unit
-                y_label = unit if metric == "Events" else f"{aggregation} ({unit})"
-                if normalization == "Per 100,000 residents":
-                    y_label += " per 100,000 residents"
-                elif normalization == "% of event-year GDP":
-                    y_label = f"{aggregation} (% of event-year GDP)"
-                kwargs = dict(color="Country", color_discrete_map=colors,
-                              category_orders={"Country": countries},
-                              hover_data=["Events", "Reported", "Missing", "Coverage (%)", "Eligible", "Missing context", "Denominator"],
-                              labels={"Value": y_label})
-                if dimension == "Start Year":
-                    fig = px.line(frame, x=dimension, y="Value", markers=True, **kwargs)
-                    fig.update_xaxes(dtick=1, tickformat="d")
-                elif dimension == "Disaster Type":
-                    fig = px.bar(frame, x="Value", y=dimension, orientation="h",
-                                 barmode="group", **kwargs)
-                else:
-                    fig = px.bar(frame, x=dimension, y="Value", **kwargs)
-                fig.update_layout(height=max(360, frame[dimension].nunique() * 32)
-                                  if dimension == "Disaster Type" else 360,
-                                  legend_title_text="", margin=dict(l=10, r=10, t=15, b=10))
+                fig = make_comparison_chart(frame, metric, dimension, countries, colors,
+                                             aggregation, normalization, **settings)
                 st.plotly_chart(fig, width="stretch", key=f"comparison.chart.{dimension}.{metric}")
+
+
+def show_event_records(selected):
+    search = st.text_input("Search event records", key="comparison.event_search",
+                           help="Search event ID, name, location, country and disaster type.")
+    records = selected
+    if search:
+        fields = [c for c in ["DisNo.", "Event Name", "Location", "Country", "Disaster Type"] if c in records]
+        match = pd.Series(False, index=records.index)
+        for field in fields:
+            match |= records[field].fillna("").astype(str).str.contains(search, case=False, regex=False)
+        records = records[match]
+    defaults = [c for c in ["DisNo.", "Country", "Disaster Type", "Disaster Subtype", "Event Name",
+                            "Start Year", "Start Month", "Start Day", "Total Deaths", "Total Affected"] if c in selected]
+    if "comparison.event_columns" in st.session_state:
+        st.session_state["comparison.event_columns"] = [c for c in st.session_state["comparison.event_columns"] if c in selected]
+    columns = st.multiselect("Event columns", selected.columns.tolist(), default=defaults,
+                             key="comparison.event_columns")
+    st.caption(f"{len(records):,} matching records. Event-table search only filters this table. "
+               "Source damage columns retain their thousands-of-US$ units.")
+    if columns:
+        st.dataframe(records[columns], hide_index=True, width="stretch")
+        st.download_button("Download displayed records (CSV)", csv_bytes(records[columns]),
+                            file_name="emview_event_records.csv", mime="text/csv", key="comparison.export_events")
+    else:
+        st.info("Choose at least one event column.")
 
 
 def main():
@@ -127,7 +135,15 @@ def main():
         st.info("Select at least one country and one impact measure.")
         return
     selected = data[data["Country"].isin(countries)]
-    context = show_country_context(selected, end.year)
+    stats = st.columns(4)
+    stats[0].metric("Events in selection", f"{len(selected):,}")
+    stats[1].metric("Countries", len(countries))
+    for column, label, field in [(stats[2], "Reported deaths", "Total Deaths"),
+                                  (stats[3], "Reported affected", "Total Affected")]:
+        value = selected[field].sum(min_count=1) if field in selected else float("nan")
+        column.metric(label, "Unavailable" if pd.isna(value) else f"{value:,.0f}")
+    with st.expander("Population and GDP context"):
+        context = show_country_context(selected, end.year)
     normalization_options = ["Absolute"]
     if context is not None:
         normalization_options.append("Per 100,000 residents")
@@ -136,6 +152,17 @@ def main():
     if st.session_state.get("comparison.normalization", "Absolute") not in normalization_options:
         st.session_state["comparison.normalization"] = "Absolute"
     normalization = st.selectbox("Normalization", normalization_options, key="comparison.normalization")
+    with st.expander("Customize charts"):
+        chart_controls = st.columns(3)
+        orientation = chart_controls[0].selectbox("Country bars", ["Vertical", "Horizontal"], key="comparison.orientation")
+        order = chart_controls[1].selectbox("Category order", ["Alphabetical", "Highest impact"], key="comparison.order")
+        palette = chart_controls[2].selectbox("Country colors", list(PALETTES), key="comparison.palette")
+        log_scale = st.checkbox("Logarithmic impact scale", key="comparison.log_scale")
+        value_labels = st.checkbox("Show bar values", key="comparison.value_labels")
+    chart_settings = dict(orientation=orientation, order=order, log_scale=log_scale, value_labels=value_labels)
+    colors = country_colors(st.session_state["data"]["Country"].dropna().unique().tolist(), palette)
+    if log_scale:
+        st.caption("A logarithmic scale displays positive values only; zeros and missing values remain in the reporting table.")
     if normalization != "Absolute":
         st.caption("Rates use each event's country population or GDP in its start year. "
                    "Missing annual denominators exclude that reported impact from the rate; "
@@ -150,22 +177,55 @@ def main():
 
     summary = aggregate_impacts(selected, metrics, aggregation=aggregation, denominator=denominator,
                                 normalization=normalization, context=context)
+    export_units = {metric: ("% of event-year GDP" if normalization == "% of event-year GDP" else
+                             METRICS[metric].unit + (" per 100,000 residents" if normalization != "Absolute" else ""))
+                    for metric in metrics}
+    export_settings = dict(start_date=start.isoformat(), end_date=end.isoformat(), aggregation=aggregation,
+                           normalization=normalization, average_denominator=denominator, units=export_units)
     if summary["Missing context"].sum():
         st.warning("Some reported impacts lack a matching annual denominator. See Missing context in the reporting table.")
-    show_charts(summary, metrics, "Country", countries, aggregation, normalization)
-    type_tab, trend_tab, coverage_tab = st.tabs(["By disaster type", "Annual trends", "Reporting coverage"])
+    if "Events" in metrics:
+        st.caption("Events shows the total event count, or the cumulative event rate when population-adjusted, regardless of the impact aggregation.")
+    show_charts(summary, metrics, "Country", countries, aggregation, normalization, chart_settings, colors)
+    type_tab, trend_tab, coverage_tab, events_tab = st.tabs(["By disaster type", "Annual trends", "Reporting coverage", "Event records"])
     with type_tab:
         by_type = aggregate_impacts(selected, metrics, ["Country", "Disaster Type"], aggregation,
                                     denominator, normalization, context)
-        show_charts(by_type, metrics, "Disaster Type", countries, aggregation, normalization)
+        show_charts(by_type, metrics, "Disaster Type", countries, aggregation, normalization, chart_settings, colors)
     with trend_tab:
         annual = aggregate_impacts(selected, metrics, ["Country", "Start Year"], aggregation,
                                    denominator, normalization, context)
-        show_charts(annual, metrics, "Start Year", countries, aggregation, normalization)
-        st.caption("Years without records are omitted. Lines do not imply continuous observation.")
+        show_charts(annual, metrics, "Start Year", countries, aggregation, normalization, chart_settings, colors)
+        st.caption("Years without records appear as gaps; no impacts are imputed for those years.")
     with coverage_tab:
         st.dataframe(summary, hide_index=True, width="stretch")
         st.caption("Reported counts include explicit zeros. Blank values may mean no impact or unknown/unreported impact; they are not filled with zero.")
+        st.download_button("Download country summary (CSV)", csv_bytes(summary_for_export(summary, export_settings)),
+                            file_name="emview_country_summary.csv", mime="text/csv", key="comparison.export_summary")
+    with events_tab:
+        show_event_records(selected)
+    settings = dict(
+        source_file=st.session_state.get("filename"), start_date=start.isoformat(), end_date=end.isoformat(),
+        date_match=st.session_state.get("filter.date_match", "starts"),
+        include_partial_start_dates=st.session_state.get("filter.include_partial", True),
+        classification_key=st.session_state["filter.classification_key"],
+        region=st.session_state["filter.region"], subregion=st.session_state["filter.subregion"],
+        sidebar_country=st.session_state["filter.country"],
+        disaster_groups=st.session_state.get("filter.groups", []), disaster_types=st.session_state.get("filter.types", []),
+        countries=countries, metrics=metrics, aggregation=aggregation, average_denominator=denominator,
+        normalization=normalization, chart_settings=chart_settings | {"palette": palette},
+        units=export_units,
+        emdat_source="EM-DAT, CRED / UCLouvain, Brussels, Belgium; https://www.emdat.be",
+        world_bank_source=None if context is None else context.attrs,
+    )
+    tables = {"country_summary": summary_for_export(summary, settings),
+              "by_disaster_type": summary_for_export(by_type, settings),
+              "annual_trends": summary_for_export(annual, settings), "filtered_events": selected}
+    if context is not None:
+        tables["annual_country_indicators"] = context[context["ISO"].isin(selected["ISO"].unique())]
+    st.download_button("Download full analysis (ZIP)", analysis_bundle(tables, settings),
+                        file_name="emview_comparison.zip", mime="application/zip", key="comparison.export_bundle",
+                        help="Includes country/type/year summaries, analyzed events, annual country indicators and active settings.")
     with st.expander("How to interpret these comparisons"):
         st.markdown("""
         - **Total** sums reported impacts in the selected period.

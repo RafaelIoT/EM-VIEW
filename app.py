@@ -3,7 +3,7 @@ import streamlit as st
 from utils.filters import init_sidebar_filters
 
 
-def init_config() -> None:
+def init_config():
     """Initialize the application.
     """
     # Shared page config
@@ -66,11 +66,11 @@ def init_config() -> None:
             time_page
         ]
     )
-    pg.run()
+    return pg
 
 
 def app() -> None:
-    init_config()
+    pg = init_config()
     init_sidebar_filters()
 
     # Sidebar link
@@ -90,6 +90,8 @@ def app() -> None:
         url="https://doc.emdat.be/",
         width='stretch'
     )
+
+    pg.run()
 
     # st.session_state # uncomment for debugging
 

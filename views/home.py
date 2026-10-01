@@ -1,4 +1,5 @@
 import io
+import hashlib
 from typing import Any
 
 import pandas as pd
@@ -6,7 +7,6 @@ import requests
 import streamlit as st
 
 from utils.layout import PAGE_HELP_TEXT
-from utils.filters import set_filters_to_default
 from utils.archload import ARCHIVE_ENDPOINT, ARCHIVE_PARAMS, ARCHIVE_METADATA
 from utils.apiload import API_ENDPOINT, BASE_QUERY, DATA_FIELDS, COLUMN_MAP, \
     API_METADATA
@@ -137,7 +137,9 @@ def process_data(data: pd.DataFrame, metadata: dict[str, Any], filename: str) ->
     buffer = io.StringIO()
     data.info(buf=buffer)
     ss['info'] = buffer.getvalue()
-    set_filters_to_default()
+    # Reset on the next run, before shared sidebar widgets are instantiated.
+    ss['filter.reset_pending'] = True
+    st.rerun()
 
 
 # Page content
@@ -168,8 +170,11 @@ if load_option == "Upload your EM-DAT file":
         type=['xlsx'],
     )
     if uploaded_file:
-        data, metadata = load_data(uploaded_file)
-        process_data(data, metadata, uploaded_file.name)
+        fingerprint = hashlib.sha256(uploaded_file.getvalue()).hexdigest()
+        if st.session_state.get('upload.fingerprint') != fingerprint:
+            data, metadata = load_data(uploaded_file)
+            st.session_state['upload.fingerprint'] = fingerprint
+            process_data(data, metadata, uploaded_file.name)
 
 elif load_option == "Load the EM-DAT archive":
     if st.button("Load Archive"):
