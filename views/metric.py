@@ -13,6 +13,9 @@ if "data" not in st.session_state:
     st.error('Please, upload your dataset first on the main page', icon="🚨")
 else:
     data: pd.DataFrame = get_filtered_data()
+    if data.empty:
+        st.info("No events match these filters. Widen the period or reset the filters.")
+        st.stop()
 
     st.html("""
     <style>

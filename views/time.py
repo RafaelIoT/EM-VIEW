@@ -18,6 +18,9 @@ if "data" not in st.session_state:
     st.error('Please, upload your dataset first on the main page', icon="🚨")
 else:
     data = get_filtered_data()
+    if data.empty:
+        st.info("No events match these filters. Widen the period or reset the filters.")
+        st.stop()
 
     cols = st.columns(2)
     variable = cols[0].selectbox(

@@ -39,6 +39,9 @@ if "data" not in st.session_state:
 else:
     # Data & period
     data = get_filtered_data()
+    if data.empty:
+        st.info("No events match these filters. Widen the period or reset the filters.")
+        st.stop()
     year_min = data['Start Year'].min()
     year_max = data['End Year'].max()
     if year_min < year_max:

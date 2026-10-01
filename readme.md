@@ -31,6 +31,17 @@ The app relies on streamlit version 1.52.
 
 Check `requirements.txt` for details.
 
+### Filter a period and disaster types
+
+The sidebar filters all views by event start year, including events with an
+unknown end year. Enable **Use exact dates** for an inclusive start/end date
+range, or choose **Overlaps period** to include events spanning the period.
+Partial start dates are included when their known month/year could fall in the
+period; turn off **Include partial start dates** to require a precise start date.
+Unknown end dates use the start-date interval and are not assumed ongoing.
+Select disaster groups and types directly, or use a classification-key prefix
+with `*` wildcards. Empty group/type selections include all categories.
+
 ### Run App
 
 With streamlit installed, use the following command to run the app:
@@ -47,4 +58,4 @@ repository and does not cover the EM-DAT data usage rights. See
 ## Acknowledgement
 
 The initial version of EM-VIEW was developed under the EM-DAT project with 
-the support of USAID. 
+the support of USAID.

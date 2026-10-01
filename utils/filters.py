@@ -1,5 +1,10 @@
+from datetime import date
+from fnmatch import translate
+
 import pandas as pd
 import streamlit as st
+
+from utils.dates import filter_dates
 
 DOC_URI = "https://doc.emdat.be/docs"
 CLASSIF_KEY_DOC_URI = (
@@ -37,6 +42,42 @@ def init_sidebar_filters() -> None:
             min_value=ss["filter.year_min"],
             max_value=ss["filter.year_max"],
             key='filter.end'
+        )
+
+        st.sidebar.toggle("Use exact dates", key="filter.exact_dates")
+        if ss["filter.exact_dates"]:
+            ss.setdefault("filter.date_start", date(ss["filter.start"], 1, 1))
+            ss.setdefault("filter.date_end", date(ss["filter.end"], 12, 31))
+            st.sidebar.date_input(
+                "Start date", key="filter.date_start",
+                min_value=date(ss["filter.year_min"], 1, 1),
+                max_value=date(ss["filter.year_max"], 12, 31),
+            )
+            st.sidebar.date_input(
+                "End date", key="filter.date_end",
+                min_value=date(ss["filter.year_min"], 1, 1),
+                max_value=date(ss["filter.year_max"], 12, 31),
+            )
+        st.sidebar.selectbox(
+            "Date match", ["starts", "overlaps"], key="filter.date_match",
+            format_func=lambda x: "Starts in period" if x == "starts" else "Overlaps period",
+            help="Unknown end dates use the start date; they are not assumed ongoing.",
+        )
+        st.sidebar.checkbox(
+            "Include partial start dates", key="filter.include_partial",
+            help="Include events when their known year/month could fall in the selected period.",
+        )
+        start_date, end_date = get_filter_period()
+        if start_date > end_date:
+            st.sidebar.warning("Start must be on or before end.")
+
+        st.sidebar.multiselect(
+            "Disaster groups", sorted(ss["data"]["Disaster Group"].dropna().unique()),
+            key="filter.groups", help="Leave empty to include all groups.",
+        )
+        st.sidebar.multiselect(
+            "Disaster types", sorted(ss["data"]["Disaster Type"].dropna().unique()),
+            key="filter.types", help="Leave empty to include all types.",
         )
 
         st.sidebar.text_input(
@@ -90,9 +131,9 @@ def process_region() -> None:
     country = ss['filter.country']
     if region:
         valid_data = rd[rd['region'] == region]
-        if subregion not in valid_data['subregion']:
+        if subregion not in valid_data['subregion'].values:
             ss['filter.subregion'] = None
-        if country not in valid_data['country']:
+        if country not in valid_data['country'].values:
             ss['filter.country'] = None
         ss['subregion_list'] = [None] + sorted(valid_data['subregion'].unique())
         ss['country_list'] = [None] + sorted(valid_data['country'].unique())
@@ -111,9 +152,9 @@ def process_subregion() -> None:
     country = ss['filter.country']
     if subregion:
         valid_data = rd[rd['subregion'] == subregion]
-        if region not in valid_data['region']:
+        if region not in valid_data['region'].values:
             ss['filter.region'] = valid_data.iloc[0]['region']
-        if country not in valid_data['country']:
+        if country not in valid_data['country'].values:
             ss['filter.country'] = None
         ss['country_list'] = [None] + sorted(valid_data['country'].unique())
     else:
@@ -134,10 +175,19 @@ def process_country() -> None:
     country = ss['filter.country']
     if country:
         valid_data = rd[rd['country'] == country]
-        if region not in valid_data['region']:
+        if region not in valid_data['region'].values:
             ss['filter.region'] = valid_data.iloc[0]['region']
-        if subregion not in valid_data['subregion']:
+        if subregion not in valid_data['subregion'].values:
             ss['filter.subregion'] = valid_data.iloc[0]['subregion']
+
+
+def get_filter_period() -> tuple[date, date]:
+    """Return the active inclusive period for views and exports."""
+    ss = st.session_state
+    if ss.get("filter.exact_dates", False):
+        return (ss.get("filter.date_start", date(ss["filter.start"], 1, 1)),
+                ss.get("filter.date_end", date(ss["filter.end"], 12, 31)))
+    return date(ss["filter.start"], 1, 1), date(ss["filter.end"], 12, 31)
 
 
 def get_filtered_data() -> pd.DataFrame:
@@ -145,28 +195,29 @@ def get_filtered_data() -> pd.DataFrame:
     ss = st.session_state
 
     # Get filters states
-    start = ss["filter.start"]
-    end = ss["filter.end"]
+    start, end = get_filter_period()
     classification_key = ss["filter.classification_key"].strip()
     region = ss["filter.region"]
     subregion = ss["filter.subregion"]
     country = ss["filter.country"]
 
     # Initiate filtering
-    data_filtered = ss['data'].copy()
-
-    # Filter by year
-    data_filtered = data_filtered[
-        (data_filtered['Start Year'] >= start) &
-        (data_filtered['End Year'] <= end)
-        ]
+    data_filtered = filter_dates(
+        ss['data'], start, end, ss.get("filter.date_match", "starts"),
+        ss.get("filter.include_partial", True),
+    )
 
     # Filter by classification key
     data_filtered = data_filtered[
         data_filtered['Classification Key'].str.match(
-            classification_key.replace('*', '.*')
+            translate(classification_key + '*'), na=False
         )
     ]
+
+    if ss.get("filter.groups"):
+        data_filtered = data_filtered[data_filtered['Disaster Group'].isin(ss['filter.groups'])]
+    if ss.get("filter.types"):
+        data_filtered = data_filtered[data_filtered['Disaster Type'].isin(ss['filter.types'])]
 
     # Filter by region, subregion, country
     if region:
@@ -193,6 +244,13 @@ def set_filters_to_default() -> None:
     ss['filter.year_max'] = year_max
     ss['filter.start'] = year_min
     ss['filter.end'] = year_max
+    ss['filter.exact_dates'] = False
+    ss['filter.date_start'] = date(year_min, 1, 1)
+    ss['filter.date_end'] = date(year_max, 12, 31)
+    ss['filter.date_match'] = "starts"
+    ss['filter.include_partial'] = True
+    ss['filter.groups'] = []
+    ss['filter.types'] = []
     ss['filter.classification_key'] = ""
     ss['filter.region'] = None
     ss['filter.subregion'] = None
