@@ -8,6 +8,8 @@ the [EM-DAT International Disaster Database](https://www.emdat.be/) data
 contained in your official EM-DAT xlsx file. EM-VIEW has multiple tabs with 
 specific features responding to filters:
 - Metric view: impact statistics, disaggregated by disaster types;
+- Country comparison: grouped impact charts, per-event averages and medians,
+  annual trends, and reporting coverage for multiple countries;
 - Table view: the EM-DAT dataframe that can be filtered by column names;
 - Map view: global or regional impact maps by country;
 - Time view: yearly-aggregated timeseries of impact, with multiple stacking 
@@ -41,6 +43,15 @@ period; turn off **Include partial start dates** to require a precise start date
 Unknown end dates use the start-date interval and are not assumed ongoing.
 Select disaster groups and types directly, or use a classification-key prefix
 with `*` wildcards. Empty group/type selections include all categories.
+
+### Compare countries
+
+Open **Country comparison** after loading your workbook. Choose countries and
+impact measures, then compare totals, means per event, or medians per event.
+Means default to events with a reported value, with an explicit option to divide
+the observed sum by all events. Blank impacts remain missing; explicit zero is
+a reported value. Reporting coverage is included in chart hovers and a table.
+Damage charts convert EM-DAT's thousands of US dollars to US dollars.
 
 ### Run App
 

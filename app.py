@@ -49,11 +49,17 @@ def init_config() -> None:
         title="Time view",
         icon=":material/timeline:"
     )
+    comparison_page = st.Page(
+        page="views/comparison.py",
+        title="Country comparison",
+        icon=":material/compare_arrows:"
+    )
 
     # Navigation setup
     pg = st.navigation(
         pages=[
             home_page,
+            comparison_page,
             metric_page,
             table_page,
             map_page,
