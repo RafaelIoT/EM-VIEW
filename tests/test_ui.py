@@ -177,6 +177,21 @@ class ComparisonUITests(unittest.TestCase):
         self.assertEqual(len(at.exception), 0)
         self.assertEqual(summary_frame(at)["Country"].unique().tolist(), ["Myanmar"])
 
+    def test_exploration_views_use_shared_filters_and_support_counts(self):
+        at = comparison_app()
+        at.switch_page("views/explore.py").run()
+        self.assertEqual(len(at.exception), 0)
+        self.assertEqual(len(at.get("plotly_chart")), 2)
+        at.selectbox(key="explore.display").select("Share of country total (%)").run()
+        at.checkbox(key="filter.country_choice.Japan").uncheck().run()
+        self.assertEqual(summary_frame(at)["Country"].unique().tolist(), ["Myanmar"])
+        at.selectbox(key="explore.aggregation").select("Median per event").run()
+        self.assertEqual(at.selectbox(key="explore.display").value, "Impact value")
+        at.selectbox(key="explore.metric").select("Events").run()
+        self.assertEqual(len(at.exception), 0)
+        self.assertEqual(len(at.get("plotly_chart")), 1)
+        self.assertEqual(summary_frame(at)["Value"].iloc[0], 1)
+
     def test_country_all_buttons_ignore_search_and_geography_preserves_choices(self):
         at = comparison_app()
         at.checkbox(key="filter.country_choice.Myanmar").uncheck().run()

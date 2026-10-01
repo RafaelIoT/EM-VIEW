@@ -10,6 +10,8 @@ specific features responding to filters:
 - Metric view: impact statistics, disaggregated by disaster types;
 - Country comparison: grouped impact charts, per-event averages and medians,
   annual trends, and reporting coverage for multiple countries;
+- Explore impacts: hazard-profile heatmaps, frequency versus severity scatter
+  plots, and ranked events;
 - Table view: the EM-DAT dataframe that can be filtered by column names;
 - Map view: global or regional impact maps by country;
 - Time view: side-by-side annual impact bars by country, hazard or geography,
@@ -96,6 +98,17 @@ to event start dates; absent observations remain gaps. Events always shows the
 record count. Damage values are displayed in US dollars.
 
 ### Customize and export a comparison
+
+**Explore impacts** offers three additional views using the same filters:
+
+- **Hazard profile:** country-by-type/subtype heatmaps for total or per-event
+  impact, each hazard's share of reported country totals, and reporting coverage.
+  Shares are unavailable when the country total is zero; blank cells are never
+  filled with zero.
+- **Frequency and severity:** event count versus mean or median impact, by
+  country and optionally disaster type. Hovers show reporting denominators.
+- **Largest events:** ranked country-disaster records for the selected measure,
+  with missing impacts excluded, explicit zeros retained, and CSV downloads.
 
 **Customize charts** controls country-bar orientation, category ordering, color
 palette, logarithmic axes, and value labels. Annual lines preserve gaps for years

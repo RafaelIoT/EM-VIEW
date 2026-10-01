@@ -54,12 +54,18 @@ def init_config():
         title="Country comparison",
         icon=":material/compare_arrows:"
     )
+    explore_page = st.Page(
+        page="views/explore.py",
+        title="Explore impacts",
+        icon=":material/scatter_plot:"
+    )
 
     # Navigation setup
     pg = st.navigation(
         pages=[
             home_page,
             comparison_page,
+            explore_page,
             metric_page,
             table_page,
             map_page,
