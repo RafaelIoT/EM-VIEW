@@ -144,13 +144,22 @@ PAGE_HELP_TEXT = {
     - **Total Damage, Adjusted ('000 US\$')**: total economic damage reported in 
     thousands of \$US, adjusted for inflation.
     
-    **Stacked Bars**
-    
-    Optionally, users may use the :point_up_2: "Stack by" select box to displayed stacked 
-    bars illustrating the impact distribution between:
-    - Disaster Types,
-    - Regions,
-    - Subregions
+    **Compare yearly impacts**
+
+    Country checkboxes in the sidebar apply to this view. Choose **Compare by**
+    to group countries, disaster types/subtypes, regions or subregions.
+    **Side-by-side bars** is the default; lines and separate panels are also
+    available. Years use event start dates, including for overlap filters.
+
+    Totals sum reported impacts. Means divide by reported events by default,
+    with an option to divide observed impact by all events. Medians use reported
+    values only. Events always displays the annual country-disaster record count.
+    Missing impacts remain unavailable, and lines preserve years without records
+    as gaps. Explicit zeros count as reported values. Damage is converted from
+    thousands of US dollars into US dollars.
+
+    Expand **Annual summary and reporting coverage** for the underlying values,
+    reporting denominators and a CSV download.
     
     For information on disaster types, we refer to the [EM-DAT Disaster 
     Classification System](https://doc.emdat.be/docs/data-structure-and-content/disaster-classification-system/).  

@@ -24,6 +24,8 @@ def comparison_app(source_data=None):
         "Region": ["Asia"] * 3, "Subregion": ["Eastern Asia", "Eastern Asia", "South-Eastern Asia"],
         "Classification Key": ["nat-hyd-flo-flo", "nat-met-sto-tro", "nat-hyd-flo-flo"],
         "Disaster Group": ["Natural"] * 3, "Disaster Type": ["Flood", "Storm", "Flood"],
+        "Disaster Subgroup": ["Hydrological", "Meteorological", "Hydrological"],
+        "Disaster Subtype": ["Riverine flood", "Tropical cyclone", "Riverine flood"],
         "Start Year": [2020, 2021, 2020], "Start Month": [2, 3, 4], "Start Day": [None, 1, 2],
         "End Year": [None, 2021, 2020], "Total Deaths": [10, None, 30],
         "Total Affected": [0, 100, None], "Total Damage ('000 US$)": [1, None, 2],
@@ -128,7 +130,8 @@ class ComparisonUITests(unittest.TestCase):
         at.switch_page("views/metric.py").run()
         self.assertEqual(len(at.exception), 0)
         self.assertIn("No events match", at.info[0].value)
-        self.assertEqual(len(at.sidebar.number_input), 2)
+        self.assertIn("filter.start", [widget.key for widget in at.sidebar.number_input])
+        self.assertIn("filter.end", [widget.key for widget in at.sidebar.number_input])
         self.assertIn("Reset", [button.label for button in at.sidebar.button])
 
     def test_country_checkboxes_preserve_hidden_selections_and_reset(self):
@@ -145,6 +148,20 @@ class ComparisonUITests(unittest.TestCase):
         self.assertTrue(at.checkbox(key="filter.country_choice.Myanmar").value)
         next(button for button in at.sidebar.button if button.label == "Reset").click().run()
         self.assertEqual(at.session_state["filter.countries"], ["Japan", "Myanmar"])
+
+    def test_time_view_controls_and_country_checkboxes(self):
+        at = comparison_app()
+        at.switch_page("views/time.py").run()
+        self.assertEqual(len(at.exception), 0)
+        self.assertEqual(at.selectbox(key="time.style").value, "Side-by-side bars")
+        self.assertEqual(at.selectbox(key="time.dimension").value, "Country")
+        at.selectbox(key="time.aggregation").select("Mean per event").run()
+        at.selectbox(key="time.dimension").select("Subregion").run()
+        at.checkbox(key="filter.country_choice.Japan").uncheck().run()
+        self.assertEqual(len(at.exception), 0)
+        self.assertEqual(summary_frame(at)["Subregion"].unique().tolist(), ["South-Eastern Asia"])
+        at.selectbox(key="time.style").select("Separate panels").run()
+        self.assertEqual(len(at.exception), 0)
 
     def test_country_all_buttons_ignore_search_and_geography_preserves_choices(self):
         at = comparison_app()

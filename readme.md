@@ -12,8 +12,8 @@ specific features responding to filters:
   annual trends, and reporting coverage for multiple countries;
 - Table view: the EM-DAT dataframe that can be filtered by column names;
 - Map view: global or regional impact maps by country;
-- Time view: yearly-aggregated timeseries of impact, with multiple stacking 
-options.
+- Time view: side-by-side annual impact bars by country, hazard or geography,
+  plus lines and separate panels with totals, per-event means or medians.
 
 You can download the EM-DAT data by registering on the 
 [EM-DAT Data Portal](https://public.emdat.be/).
@@ -79,6 +79,15 @@ without WDI observations remain unavailable.
 Sources: [World Bank population](https://data.worldbank.org/indicator/SP.POP.TOTL),
 [GDP](https://data.worldbank.org/indicator/NY.GDP.MKTP.CD),
 [GDP per capita](https://data.worldbank.org/indicator/NY.GDP.PCAP.CD).
+
+### Compare impacts over time
+
+**Time view** defaults to country bars displayed side by side. Switch **Compare
+by** to disaster type/subtype, region, subregion or all events. Choose lines or
+separate panels, totals, means or medians, colors, log scale and value labels.
+The annual summary includes reporting coverage and a CSV download. Years refer
+to event start dates; absent observations remain gaps. Events always shows the
+record count. Damage values are displayed in US dollars.
 
 ### Customize and export a comparison
 
